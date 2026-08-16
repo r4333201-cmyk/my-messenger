@@ -41,12 +41,29 @@
         .chat-area { flex: 1; display: flex; flex-direction: column; background: #0b132b; }
         .chat-header { padding: 15px 20px; background: #1e293b; border-bottom: 1px solid #334155; font-weight: bold; font-size: 1.1rem; }
         .messages-container { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
+        
         .message { max-width: 60%; padding: 10px 14px; border-radius: 10px; font-size: 0.95rem; word-break: break-word; }
         .message.incoming { background: #1e293b; align-self: flex-start; }
         .message.outgoing { background: #2563eb; align-self: flex-end; }
         .msg-time { font-size: 0.75rem; color: #94a3b8; text-align: right; margin-top: 4px; }
         
-        .message-input-area { padding: 15px; background: #1e293b; display: flex; gap: 10px; border-top: 1px solid #334155; }
+        /* Стили для картинок в чате */
+        .message img {
+            max-width: 100%;
+            max-height: 250px;
+            border-radius: 6px;
+            display: block;
+            margin-bottom: 4px;
+            cursor: pointer;
+        }
+
+        .message-input-area { padding: 15px; background: #1e293b; display: flex; gap: 10px; border-top: 1px solid #334155; align-items: center; }
+        
+        /* Кнопка скрепки для фото */
+        .attach-btn {
+            background: #334155; color: #38bdf8; border: none; border-radius: 8px; width: 45px; height: 45px; display: flex; justify-content: center; align-items: center; font-size: 1.2rem; cursor: pointer; transition: background 0.2s; flex-shrink: 0;
+        }
+        .attach-btn:hover { background: #475569; }
     </style>
 </head>
 <body>
@@ -74,8 +91,13 @@
         <div class="chat-area" id="chatArea" style="display: none;">
             <div class="chat-header" id="activeChatTitle">Выберите чат</div>
             <div class="messages-container" id="messagesContainer"></div>
+            
             <form class="message-input-area" id="messageForm">
-                <input type="text" id="messageInput" class="input-field" placeholder="Написать сообщение..." autocomplete="off" required>
+                <!-- Скрытый инпут для выбора файлов (галереи) -->
+                <input type="file" id="imageInput" accept="image/*" style="display: none;">
+                <button type="button" class="attach-btn" id="attachBtn" title="Отправить фото">📎</button>
+                
+                <input type="text" id="messageInput" class="input-field" placeholder="Написать сообщение..." autocomplete="off">
                 <button type="submit" class="btn" style="width: auto; padding: 0 25px;">➤</button>
             </form>
         </div>
@@ -88,7 +110,6 @@
         let myUsername = null;
         let activeChat = null;
         
-        // Загружаем сохраненные чаты и историю из localStorage, если они есть
         let chatsData = {};
         const savedChats = localStorage.getItem('chat_history_data');
         if (savedChats) {
@@ -116,6 +137,9 @@
         const messagesContainer = document.getElementById('messagesContainer');
         const messageForm = document.getElementById('messageForm');
         const messageInput = document.getElementById('messageInput');
+        
+        const attachBtn = document.getElementById('attachBtn');
+        const imageInput = document.getElementById('imageInput');
 
         ws.onopen = () => {
             const savedUser = localStorage.getItem('chat_username');
@@ -146,8 +170,6 @@
                 authScreen.style.display = 'none';
                 appScreen.style.display = 'flex';
                 myUsernameDisplay.textContent = `👤 @${myUsername}`;
-                
-                // Сразу отображаем сохраненные чаты после входа
                 updateChatsList();
             }
 
@@ -175,7 +197,6 @@
                 if (!chatsData[partner]) chatsData[partner] = [];
                 chatsData[partner].push(data);
                 
-                // Сохраняем обновленную историю в localStorage
                 localStorage.setItem('chat_history_data', JSON.stringify(chatsData));
 
                 updateChatsList();
@@ -222,8 +243,16 @@
             for (const msg of messages) {
                 const div = document.createElement('div');
                 div.className = `message ${msg.from === myUsername ? 'outgoing' : 'incoming'}`;
+                
+                let contentHtml = '';
+                if (msg.isImage) {
+                    contentHtml = `<img src="${msg.text}" alt="photo">`;
+                } else {
+                    contentHtml = `<div>${msg.text}</div>`;
+                }
+
                 div.innerHTML = `
-                    <div>${msg.text}</div>
+                    ${contentHtml}
                     <div class="msg-time">${msg.time}</div>
                 `;
                 messagesContainer.appendChild(div);
@@ -231,12 +260,42 @@
             messagesContainer.scrollTop = messagesContainer.scrollHeight;
         }
 
+        // Клик по скрепке открывает галерею телефона
+        attachBtn.addEventListener('click', () => {
+            if (!activeChat) {
+                alert('Сначала выберите чат!');
+                return;
+            }
+            imageInput.click();
+        });
+
+        // Когда пользователь выбрал картинку
+        imageInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(uploadEvent) {
+                const base64Image = uploadEvent.target.result;
+                
+                // Отправляем через вебсокет специальный тип сообщения или флаг
+                ws.send(JSON.stringify({ 
+                    type: 'SEND_MESSAGE', 
+                    recipient: activeChat, 
+                    text: base64Image,
+                    isImage: true 
+                }));
+            };
+            reader.readAsDataURL(file);
+            imageInput.value = ''; // Сбрасываем инпут
+        });
+
         messageForm.addEventListener('submit', (e) => {
             e.preventDefault();
             const text = messageInput.value.trim();
             if (!text || !activeChat) return;
 
-            ws.send(JSON.stringify({ type: 'SEND_MESSAGE', recipient: activeChat, text }));
+            ws.send(JSON.stringify({ type: 'SEND_MESSAGE', recipient: activeChat, text, isImage: false }));
             messageInput.value = '';
         });
     </script>
