@@ -7,13 +7,14 @@ const app = express();
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
-// Раздаем статические файлы (включая index.html)
-app.use(express.static(path.join(__dirname)));
+// Явно отдаем index.html при заходе на главную страницу
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'index.html'));
+});
 
-// Обработка WebSocket подключений
+// Обработка WebSocket
 wss.on('connection', (ws) => {
     ws.on('message', (message) => {
-        // Пересылаем сообщение всем подключенным клиентам
         wss.clients.forEach((client) => {
             if (client.readyState === WebSocket.OPEN) {
                 client.send(message.toString());
@@ -22,7 +23,6 @@ wss.on('connection', (ws) => {
     });
 });
 
-// Порт для Render или локального запуска
 const PORT = process.env.PORT || 8080;
 server.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
