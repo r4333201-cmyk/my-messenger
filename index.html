@@ -2,15 +2,15 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Telegram Clone</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-        body { background-color: #0f172a; color: #f8fafc; height: 100vh; display: flex; justify-content: center; align-items: center; overflow: hidden; }
+        body { background-color: #0f172a; color: #f8fafc; height: 100vh; display: flex; justify-content: center; align-items: center; }
 
         #authScreen {
             width: 100%; max-width: 400px; background: #1e293b; padding: 30px; border-radius: 12px;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.3); display: flex; flex-direction: column; gap: 15px; margin: 20px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.3); display: flex; flex-direction: column; gap: 15px;
         }
         #authScreen h2 { text-align: center; margin-bottom: 10px; color: #38bdf8; }
         .input-field {
@@ -24,65 +24,29 @@
         .error-msg { color: #f87171; font-size: 0.9rem; text-align: center; }
 
         #appScreen {
-            display: none; width: 100vw; height: 100vh; background: #0f172a; flex-direction: row; position: relative;
+            display: none; width: 100vw; height: 100vh; background: #0f172a; flex-direction: row;
         }
-        
         .sidebar {
-            width: 320px; background: #1e293b; border-right: 1px solid #334155; display: flex; flex-direction: column; height: 100%;
+            width: 320px; background: #1e293b; border-right: 1px solid #334155; display: flex; flex-direction: column;
         }
         .sidebar-header { padding: 15px; background: #0f172a; border-bottom: 1px solid #334155; display: flex; flex-direction: column; gap: 10px; }
-        
-        .user-panel { display: flex; justify-content: space-between; align-items: center; }
-        .logout-btn { background: #334155; color: #f87171; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 0.85rem; font-weight: bold; transition: background 0.2s; }
-        .logout-btn:hover { background: #475569; }
-
         .search-box { display: flex; gap: 5px; }
         .chats-list { flex: 1; overflow-y: auto; }
         .chat-item {
             padding: 15px; display: flex; align-items: center; gap: 12px; cursor: pointer; border-bottom: 1px solid #1e293b; transition: background 0.2s;
         }
         .chat-item:hover, .chat-item.active { background: #334155; }
-        .avatar { width: 45px; height: 45px; border-radius: 50%; background: #38bdf8; color: #0f172a; display: flex; justify-content: center; align-items: center; font-weight: bold; font-size: 1.2rem; flex-shrink: 0; }
+        .avatar { width: 45px; height: 45px; border-radius: 50%; background: #38bdf8; color: #0f172a; display: flex; justify-content: center; align-items: center; font-weight: bold; font-size: 1.2rem; }
 
-        .chat-area { flex: 1; display: flex; flex-direction: column; background: #0b132b; height: 100%; }
-        
-        .chat-header { padding: 15px 20px; background: #1e293b; border-bottom: 1px solid #334155; font-weight: bold; font-size: 1.1rem; display: flex; align-items: center; gap: 15px; }
-        
-        .back-btn { display: none; background: none; border: none; color: #38bdf8; font-size: 1.2rem; cursor: pointer; padding: 2px 6px; }
-
+        .chat-area { flex: 1; display: flex; flex-direction: column; background: #0b132b; }
+        .chat-header { padding: 15px 20px; background: #1e293b; border-bottom: 1px solid #334155; font-weight: bold; font-size: 1.1rem; }
         .messages-container { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
-        
-        .message { max-width: 75%; padding: 10px 14px; border-radius: 10px; font-size: 0.95rem; word-break: break-word; }
+        .message { max-width: 60%; padding: 10px 14px; border-radius: 10px; font-size: 0.95rem; word-break: break-word; }
         .message.incoming { background: #1e293b; align-self: flex-start; }
         .message.outgoing { background: #2563eb; align-self: flex-end; }
         .msg-time { font-size: 0.75rem; color: #94a3b8; text-align: right; margin-top: 4px; }
         
-        .message img {
-            max-width: 100%;
-            max-height: 250px;
-            border-radius: 6px;
-            display: block;
-            margin-bottom: 4px;
-            cursor: pointer;
-        }
-
-        .message-input-area { padding: 12px 15px; background: #1e293b; display: flex; gap: 10px; border-top: 1px solid #334155; align-items: center; }
-        
-        .attach-btn {
-            background: #334155; color: #38bdf8; border: none; border-radius: 8px; width: 42px; height: 42px; display: flex; justify-content: center; align-items: center; font-size: 1.2rem; cursor: pointer; transition: background 0.2s; flex-shrink: 0;
-        }
-        .attach-btn:hover { background: #475569; }
-
-        @media (max-width: 768px) {
-            .sidebar { width: 100%; display: flex; }
-            .chat-area { display: none; width: 100%; position: absolute; top: 0; left: 0; z-index: 10; }
-            
-            #appScreen.chat-open .sidebar { display: none; }
-            #appScreen.chat-open .chat-area { display: flex; }
-            
-            .back-btn { display: inline-block; }
-            .message { max-width: 85%; }
-        }
+        .message-input-area { padding: 15px; background: #1e293b; display: flex; gap: 10px; border-top: 1px solid #334155; }
     </style>
 </head>
 <body>
@@ -98,10 +62,7 @@
     <div id="appScreen">
         <div class="sidebar">
             <div class="sidebar-header">
-                <div class="user-panel">
-                    <div style="font-weight: bold; font-size: 1.1rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" id="myUsernameDisplay"></div>
-                    <button class="logout-btn" id="logoutBtn">Выйти</button>
-                </div>
+                <div style="font-weight: bold; font-size: 1.1rem;" id="myUsernameDisplay"></div>
                 <div class="search-box">
                     <input type="text" id="searchInput" class="input-field" placeholder="Найти по username...">
                     <button class="btn" id="searchBtn" style="width: auto; padding: 0 15px;">🔍</button>
@@ -110,19 +71,12 @@
             <div class="chats-list" id="chatsList"></div>
         </div>
 
-        <div class="chat-area" id="chatArea">
-            <div class="chat-header">
-                <button class="back-btn" id="backBtn">❮</button>
-                <div id="activeChatTitle" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Выберите чат</div>
-            </div>
+        <div class="chat-area" id="chatArea" style="display: none;">
+            <div class="chat-header" id="activeChatTitle">Выберите чат</div>
             <div class="messages-container" id="messagesContainer"></div>
-            
             <form class="message-input-area" id="messageForm">
-                <input type="file" id="imageInput" accept="image/*" style="display: none;">
-                <button type="button" class="attach-btn" id="attachBtn" title="Отправить фото">📎</button>
-                
-                <input type="text" id="messageInput" class="input-field" placeholder="Написать сообщение..." autocomplete="off">
-                <button type="submit" class="btn" style="width: auto; padding: 0 20px;">➤</button>
+                <input type="text" id="messageInput" class="input-field" placeholder="Написать сообщение..." autocomplete="off" required>
+                <button type="submit" class="btn" style="width: auto; padding: 0 25px;">➤</button>
             </form>
         </div>
     </div>
@@ -134,6 +88,7 @@
         let myUsername = null;
         let activeChat = null;
         
+        // Загружаем сохраненные чаты и историю из localStorage, если они есть
         let chatsData = {};
         const savedChats = localStorage.getItem('chat_history_data');
         if (savedChats) {
@@ -149,7 +104,6 @@
         const usernameInput = document.getElementById('usernameInput');
         const passwordInput = document.getElementById('passwordInput');
         const loginBtn = document.getElementById('loginBtn');
-        const logoutBtn = document.getElementById('logoutBtn');
         const errorMsg = document.getElementById('errorMsg');
 
         const myUsernameDisplay = document.getElementById('myUsernameDisplay');
@@ -159,13 +113,9 @@
         
         const chatArea = document.getElementById('chatArea');
         const activeChatTitle = document.getElementById('activeChatTitle');
-        const backBtn = document.getElementById('backBtn');
         const messagesContainer = document.getElementById('messagesContainer');
         const messageForm = document.getElementById('messageForm');
         const messageInput = document.getElementById('messageInput');
-        
-        const attachBtn = document.getElementById('attachBtn');
-        const imageInput = document.getElementById('imageInput');
 
         ws.onopen = () => {
             const savedUser = localStorage.getItem('chat_username');
@@ -188,12 +138,6 @@
             ws.send(JSON.stringify({ type: 'LOGIN', username, password }));
         });
 
-        logoutBtn.addEventListener('click', () => {
-            localStorage.removeItem('chat_username');
-            localStorage.removeItem('chat_password');
-            location.reload();
-        });
-
         ws.onmessage = (event) => {
             const data = JSON.parse(event.data);
 
@@ -202,6 +146,8 @@
                 authScreen.style.display = 'none';
                 appScreen.style.display = 'flex';
                 myUsernameDisplay.textContent = `👤 @${myUsername}`;
+                
+                // Сразу отображаем сохраненные чаты после входа
                 updateChatsList();
             }
 
@@ -229,6 +175,7 @@
                 if (!chatsData[partner]) chatsData[partner] = [];
                 chatsData[partner].push(data);
                 
+                // Сохраняем обновленную историю в localStorage
                 localStorage.setItem('chat_history_data', JSON.stringify(chatsData));
 
                 updateChatsList();
@@ -245,20 +192,12 @@
 
         function openChat(username) {
             activeChat = username;
+            chatArea.style.display = 'flex';
             activeChatTitle.textContent = `@${username}`;
             if (!chatsData[username]) chatsData[username] = [];
-            
-            appScreen.classList.add('chat-open');
-            
             updateChatsList();
             renderMessages();
         }
-
-        backBtn.addEventListener('click', () => {
-            appScreen.classList.remove('chat-open');
-            activeChat = null;
-            updateChatsList();
-        });
 
         function updateChatsList() {
             chatsList.innerHTML = '';
@@ -283,16 +222,8 @@
             for (const msg of messages) {
                 const div = document.createElement('div');
                 div.className = `message ${msg.from === myUsername ? 'outgoing' : 'incoming'}`;
-                
-                let contentHtml = '';
-                if (msg.isImage) {
-                    contentHtml = `<img src="${msg.text}" alt="photo">`;
-                } else {
-                    contentHtml = `<div>${msg.text}</div>`;
-                }
-
                 div.innerHTML = `
-                    ${contentHtml}
+                    <div>${msg.text}</div>
                     <div class="msg-time">${msg.time}</div>
                 `;
                 messagesContainer.appendChild(div);
@@ -300,61 +231,12 @@
             messagesContainer.scrollTop = messagesContainer.scrollHeight;
         }
 
-        attachBtn.addEventListener('click', () => {
-            if (!activeChat) {
-                alert('Сначала выберите чат!');
-                return;
-            }
-            imageInput.click();
-        });
-
-        imageInput.addEventListener('change', (e) => {
-            const file = e.target.files[0];
-            if (!file) return;
-
-            const reader = new FileReader();
-            reader.onload = function(uploadEvent) {
-                const img = new Image();
-                img.onload = function() {
-                    const canvas = document.createElement('canvas');
-                    let width = img.width;
-                    let height = img.height;
-                    
-                    const MAX_DIMENSION = 1200;
-                    if (width > height && width > MAX_DIMENSION) {
-                        height *= MAX_DIMENSION / width;
-                        width = MAX_DIMENSION;
-                    } else if (height > MAX_DIMENSION) {
-                        width *= MAX_DIMENSION / height;
-                        height = MAX_DIMENSION;
-                    }
-                    
-                    canvas.width = width;
-                    canvas.height = height;
-                    const ctx = canvas.getContext('2d');
-                    ctx.drawImage(img, 0, 0, width, height);
-                    
-                    const compressedBase64 = canvas.toDataURL('image/jpeg', 0.75);
-
-                    ws.send(JSON.stringify({ 
-                        type: 'SEND_MESSAGE', 
-                        recipient: activeChat, 
-                        text: compressedBase64,
-                        isImage: true 
-                    }));
-                }
-                img.src = uploadEvent.target.result;
-            };
-            reader.readAsDataURL(file);
-            imageInput.value = '';
-        });
-
         messageForm.addEventListener('submit', (e) => {
             e.preventDefault();
             const text = messageInput.value.trim();
             if (!text || !activeChat) return;
 
-            ws.send(JSON.stringify({ type: 'SEND_MESSAGE', recipient: activeChat, text, isImage: false }));
+            ws.send(JSON.stringify({ type: 'SEND_MESSAGE', recipient: activeChat, text }));
             messageInput.value = '';
         });
     </script>
