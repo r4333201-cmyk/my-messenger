@@ -1,9 +1,13 @@
 {
-  "name": "messenger",
+  "name": "my-messenger",
   "version": "1.0.0",
-  "description": "",
+  "description": "Messenger app",
   "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
   "dependencies": {
-    "ws": "^8.18.0"
+    "express": "^4.19.2",
+    "ws": "^8.16.0"
   }
 }
