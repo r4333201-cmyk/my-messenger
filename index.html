@@ -82,13 +82,22 @@
     </div>
 
     <script>
-        // Автоматически определяем WebSocket протокол (ws:// или wss:// для Render)
         const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         const ws = new WebSocket(`${wsProtocol}//${window.location.host}`);
 
         let myUsername = null;
         let activeChat = null;
-        const chatsData = {};
+        
+        // Загружаем сохраненные чаты и историю из localStorage, если они есть
+        let chatsData = {};
+        const savedChats = localStorage.getItem('chat_history_data');
+        if (savedChats) {
+            try {
+                chatsData = JSON.parse(savedChats);
+            } catch (e) {
+                chatsData = {};
+            }
+        }
 
         const authScreen = document.getElementById('authScreen');
         const appScreen = document.getElementById('appScreen');
@@ -137,6 +146,9 @@
                 authScreen.style.display = 'none';
                 appScreen.style.display = 'flex';
                 myUsernameDisplay.textContent = `👤 @${myUsername}`;
+                
+                // Сразу отображаем сохраненные чаты после входа
+                updateChatsList();
             }
 
             if (data.type === 'ERROR') {
@@ -162,6 +174,10 @@
                 const partner = data.from === myUsername ? data.to : data.from;
                 if (!chatsData[partner]) chatsData[partner] = [];
                 chatsData[partner].push(data);
+                
+                // Сохраняем обновленную историю в localStorage
+                localStorage.setItem('chat_history_data', JSON.stringify(chatsData));
+
                 updateChatsList();
                 if (activeChat === partner) renderMessages();
             }
