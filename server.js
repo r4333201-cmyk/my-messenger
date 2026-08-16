@@ -1,100 +1,47 @@
-const express = require('express');
-const http = require('http');
-const WebSocket = require('ws');
-const path = require('path');
+const clients = {}; // { username: ws_connection }
+const offlineMessages = {}; // { username: [ {from, to, text, isImage, time} ] }
 
-const app = express();
-const server = http.createServer(app);
-const wss = new WebSocket.Server({ server });
+// Внутри обработки входящих сообщений:
+ws.on('message', (message) => {
+    const data = JSON.parse(message);
 
-// Хранилище пользователей и активных клиентов { username: ws }
-const users = {
-    "test": "test" // Можешь добавить базового пользователя для проверки
-};
-const clients = new Map();
+    if (data.type === 'LOGIN') {
+        clients[data.username] = ws;
+        ws.username = data.username;
+        
+        ws.send(JSON.stringify({ type: 'LOGIN_SUCCESS', username: data.username }));
 
-// Явно отдаем index.html при заходе на сайт
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'index.html'));
-});
-
-// Обработка WebSocket подключений
-wss.on('connection', (ws) => {
-    let currentUsername = null;
-
-    ws.on('message', (message) => {
-        try {
-            const data = JSON.parse(message);
-
-            // Обработка входа / регистрации
-            if (data.type === 'LOGIN') {
-                const { username, password } = data;
-                if (!username || !password) {
-                    ws.send(JSON.stringify({ type: 'ERROR', message: 'Заполните все поля!' }));
-                    return;
-                }
-
-                if (users[username]) {
-                    if (users[username] === password) {
-                        currentUsername = username;
-                        clients.set(username, ws);
-                        ws.send(JSON.stringify({ type: 'LOGIN_SUCCESS', username }));
-                    } else {
-                        ws.send(JSON.stringify({ type: 'ERROR', message: 'Неверный пароль!' }));
-                    }
-                } else {
-                    // Регистрация нового пользователя
-                    users[username] = password;
-                    currentUsername = username;
-                    clients.set(username, ws);
-                    ws.send(JSON.stringify({ type: 'LOGIN_SUCCESS', username }));
-                }
-            }
-
-            // Поиск пользователя по username
-            if (data.type === 'SEARCH_USER') {
-                const query = data.query.replace('@', '').trim();
-                const exists = users.hasOwnProperty(query);
-                ws.send(JSON.stringify({ type: 'SEARCH_RESULT', found: exists, username: query }));
-            }
-
-            // Отправка личного сообщения
-            if (data.type === 'SEND_MESSAGE') {
-                if (!currentUsername) return;
-                const { recipient, text } = data;
-                const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
-                const messagePayload = {
-                    type: 'NEW_MESSAGE',
-                    from: currentUsername,
-                    to: recipient,
-                    text: text,
-                    time: time
-                };
-
-                // Отправляем получателю, если он онлайн
-                const recipientWs = clients.get(recipient);
-                if (recipientWs && recipientWs.readyState === WebSocket.OPEN) {
-                    recipientWs.send(JSON.stringify(messagePayload));
-                }
-
-                // Отправляем обратно отправителю, чтобы у него тоже отобразилось
-                ws.send(JSON.stringify(messagePayload));
-            }
-
-        } catch (err) {
-            console.error("Ошибка обработки сообщения:", err);
+        // Отправляем все накопленные офлайн-сообщения
+        if (offlineMessages[data.username] && offlineMessages[data.username].length > 0) {
+            offlineMessages[data.username].forEach(msg => {
+                ws.send(JSON.stringify({ type: 'NEW_MESSAGE', ...msg }));
+            });
+            offlineMessages[data.username] = []; // Очищаем после отправки
         }
-    });
+    }
 
-    ws.on('close', () => {
-        if (currentUsername) {
-            clients.delete(currentUsername);
+    if (data.type === 'SEND_MESSAGE') {
+        const messagePayload = {
+            type: 'NEW_MESSAGE',
+            from: ws.username,
+            to: data.recipient,
+            text: data.text,
+            isImage: data.isImage,
+            time: data.time || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        };
+
+        // Отправляем получателю, если он онлайн
+        if (clients[data.recipient] && clients[data.recipient].readyState === WebSocket.OPEN) {
+            clients[data.recipient].send(JSON.stringify(messagePayload));
+        } else {
+            // Если получатель офлайн, сохраняем сообщение
+            if (!offlineMessages[data.recipient]) {
+                offlineMessages[data.recipient] = [];
+            }
+            offlineMessages[data.recipient].push(messagePayload);
         }
-    });
-});
 
-const PORT = process.env.PORT || 8080;
-server.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}`);
+        // Обязательно дублируем сообщение обратно отправителю, чтобы оно отобразилось у него в чате
+        ws.send(JSON.stringify(messagePayload));
+    }
 });
