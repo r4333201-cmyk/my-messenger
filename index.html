@@ -57,22 +57,9 @@
         .message.outgoing { background: #2563eb; align-self: flex-end; }
         .msg-time { font-size: 0.75rem; color: #94a3b8; text-align: right; margin-top: 4px; }
         
-        .message img {
-            max-width: 100%;
-            max-height: 250px;
-            border-radius: 6px;
-            display: block;
-            margin-bottom: 4px;
-            cursor: pointer;
-        }
+        .message-input-area { padding: 12px 15px; background: #1e293b; display: flex; gap: 10px; border-top: 1px solid #334155; }
 
-        .message-input-area { padding: 12px 15px; background: #1e293b; display: flex; gap: 10px; border-top: 1px solid #334155; align-items: center; }
-        
-        .attach-btn {
-            background: #334155; color: #38bdf8; border: none; border-radius: 8px; width: 42px; height: 42px; display: flex; justify-content: center; align-items: center; font-size: 1.2rem; cursor: pointer; transition: background 0.2s; flex-shrink: 0;
-        }
-        .attach-btn:hover { background: #475569; }
-
+        /* Мобильная адаптивность */
         @media (max-width: 768px) {
             .sidebar { width: 100%; display: flex; }
             .chat-area { display: none; width: 100%; position: absolute; top: 0; left: 0; z-index: 10; }
@@ -116,12 +103,8 @@
                 <div id="activeChatTitle" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Выберите чат</div>
             </div>
             <div class="messages-container" id="messagesContainer"></div>
-            
             <form class="message-input-area" id="messageForm">
-                <input type="file" id="imageInput" accept="image/*" style="display: none;">
-                <button type="button" class="attach-btn" id="attachBtn" title="Отправить фото">📎</button>
-                
-                <input type="text" id="messageInput" class="input-field" placeholder="Написать сообщение..." autocomplete="off">
+                <input type="text" id="messageInput" class="input-field" placeholder="Написать сообщение..." autocomplete="off" required>
                 <button type="submit" class="btn" style="width: auto; padding: 0 20px;">➤</button>
             </form>
         </div>
@@ -163,9 +146,6 @@
         const messagesContainer = document.getElementById('messagesContainer');
         const messageForm = document.getElementById('messageForm');
         const messageInput = document.getElementById('messageInput');
-        
-        const attachBtn = document.getElementById('attachBtn');
-        const imageInput = document.getElementById('imageInput');
 
         ws.onopen = () => {
             const savedUser = localStorage.getItem('chat_username');
@@ -283,16 +263,8 @@
             for (const msg of messages) {
                 const div = document.createElement('div');
                 div.className = `message ${msg.from === myUsername ? 'outgoing' : 'incoming'}`;
-                
-                let contentHtml = '';
-                if (msg.isImage) {
-                    contentHtml = `<img src="${msg.text}" alt="photo">`;
-                } else {
-                    contentHtml = `<div>${msg.text}</div>`;
-                }
-
                 div.innerHTML = `
-                    ${contentHtml}
+                    <div>${msg.text}</div>
                     <div class="msg-time">${msg.time}</div>
                 `;
                 messagesContainer.appendChild(div);
@@ -300,61 +272,12 @@
             messagesContainer.scrollTop = messagesContainer.scrollHeight;
         }
 
-        attachBtn.addEventListener('click', () => {
-            if (!activeChat) {
-                alert('Сначала выберите чат!');
-                return;
-            }
-            imageInput.click();
-        });
-
-        imageInput.addEventListener('change', (e) => {
-            const file = e.target.files[0];
-            if (!file) return;
-
-            const reader = new FileReader();
-            reader.onload = function(uploadEvent) {
-                const img = new Image();
-                img.onload = function() {
-                    const canvas = document.createElement('canvas');
-                    let width = img.width;
-                    let height = img.height;
-                    
-                    const MAX_DIMENSION = 1200;
-                    if (width > height && width > MAX_DIMENSION) {
-                        height *= MAX_DIMENSION / width;
-                        width = MAX_DIMENSION;
-                    } else if (height > MAX_DIMENSION) {
-                        width *= MAX_DIMENSION / height;
-                        height = MAX_DIMENSION;
-                    }
-                    
-                    canvas.width = width;
-                    canvas.height = height;
-                    const ctx = canvas.getContext('2d');
-                    ctx.drawImage(img, 0, 0, width, height);
-                    
-                    const compressedBase64 = canvas.toDataURL('image/jpeg', 0.75);
-
-                    ws.send(JSON.stringify({ 
-                        type: 'SEND_MESSAGE', 
-                        recipient: activeChat, 
-                        text: compressedBase64,
-                        isImage: true 
-                    }));
-                }
-                img.src = uploadEvent.target.result;
-            };
-            reader.readAsDataURL(file);
-            imageInput.value = '';
-        });
-
         messageForm.addEventListener('submit', (e) => {
             e.preventDefault();
             const text = messageInput.value.trim();
             if (!text || !activeChat) return;
 
-            ws.send(JSON.stringify({ type: 'SEND_MESSAGE', recipient: activeChat, text, isImage: false }));
+            ws.send(JSON.stringify({ type: 'SEND_MESSAGE', recipient: activeChat, text }));
             messageInput.value = '';
         });
     </script>
