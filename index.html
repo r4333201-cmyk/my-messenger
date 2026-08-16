@@ -3,12 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Telegram Web (Clone)</title>
+    <title>Telegram Clone</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
         body { background-color: #0f172a; color: #f8fafc; height: 100vh; display: flex; justify-content: center; align-items: center; }
 
-        /* Окно авторизации */
         #authScreen {
             width: 100%; max-width: 400px; background: #1e293b; padding: 30px; border-radius: 12px;
             box-shadow: 0 10px 25px rgba(0,0,0,0.3); display: flex; flex-direction: column; gap: 15px;
@@ -24,9 +23,8 @@
         .btn:hover { background: #0ea5e9; }
         .error-msg { color: #f87171; font-size: 0.9rem; text-align: center; }
 
-        /* Интерфейс мессенджера */
         #appScreen {
-            display: none; width: 100vw; height: 100vh; background: #0f172a; display: none; flex-direction: row;
+            display: none; width: 100vw; height: 100vh; background: #0f172a; flex-direction: row;
         }
         .sidebar {
             width: 320px; background: #1e293b; border-right: 1px solid #334155; display: flex; flex-direction: column;
@@ -53,7 +51,6 @@
 </head>
 <body>
 
-    <!-- Окно входа -->
     <div id="authScreen">
         <h2>Telegram Clone</h2>
         <input type="text" id="usernameInput" class="input-field" placeholder="Придумайте Username (например, alex)">
@@ -62,7 +59,6 @@
         <div class="error-msg" id="errorMsg"></div>
     </div>
 
-    <!-- Основной экран мессенджера -->
     <div id="appScreen">
         <div class="sidebar">
             <div class="sidebar-header">
@@ -72,9 +68,7 @@
                     <button class="btn" id="searchBtn" style="width: auto; padding: 0 15px;">🔍</button>
                 </div>
             </div>
-            <div class="chats-list" id="chatsList">
-                <!-- Список чатов будет здесь -->
-            </div>
+            <div class="chats-list" id="chatsList"></div>
         </div>
 
         <div class="chat-area" id="chatArea" style="display: none;">
@@ -88,11 +82,11 @@
     </div>
 
     <script>
-        const ws = new WebSocket('ws://localhost:8080');
+        const ws = new WebSocket('ws://192.168.100.48:8080');
 
         let myUsername = null;
-        let activeChat = null; // с кем сейчас открыт чат
-        const chatsData = {}; // { username: [messages] }
+        let activeChat = null;
+        const chatsData = {};
 
         const authScreen = document.getElementById('authScreen');
         const appScreen = document.getElementById('appScreen');
@@ -112,7 +106,15 @@
         const messageForm = document.getElementById('messageForm');
         const messageInput = document.getElementById('messageInput');
 
-        // Авторизация / Регистрация
+        // Проверяем, был ли сохранен пользователь ранее
+        ws.onopen = () => {
+            const savedUser = localStorage.getItem('chat_username');
+            const savedPass = localStorage.getItem('chat_password');
+            if (savedUser && savedPass) {
+                ws.send(JSON.stringify({ type: 'LOGIN', username: savedUser, password: savedPass }));
+            }
+        };
+
         loginBtn.addEventListener('click', () => {
             const username = usernameInput.value.trim();
             const password = passwordInput.value.trim();
@@ -120,18 +122,18 @@
                 errorMsg.textContent = 'Заполните все поля!';
                 return;
             }
+            // Сохраняем данные для автологина
+            localStorage.setItem('chat_username', username);
+            localStorage.setItem('chat_password', password);
+
             ws.send(JSON.stringify({ type: 'LOGIN', username, password }));
         });
 
-        // Обработка ответов сервера
         ws.onmessage = (event) => {
             const data = JSON.parse(event.data);
 
             if (data.type === 'LOGIN_SUCCESS') {
                 myUsername = data.username;
-                // Сохраняем сессию в localStorage, чтобы при обновлении страницы помнить пользователя
-                localStorage.setItem('tg_username', myUsername);
-
                 authScreen.style.display = 'none';
                 appScreen.style.display = 'flex';
                 myUsernameDisplay.textContent = `👤 @${myUsername}`;
@@ -139,6 +141,9 @@
 
             if (data.type === 'ERROR') {
                 errorMsg.textContent = data.message;
+                // Если ошибка входа, сбрасываем сохраненные данные
+                localStorage.removeItem('chat_username');
+                localStorage.removeItem('chat_password');
             }
 
             if (data.type === 'SEARCH_RESULT') {
@@ -156,21 +161,13 @@
 
             if (data.type === 'NEW_MESSAGE') {
                 const partner = data.from === myUsername ? data.to : data.from;
-                
-                if (!chatsData[partner]) {
-                    chatsData[partner] = [];
-                }
+                if (!chatsData[partner]) chatsData[partner] = [];
                 chatsData[partner].push(data);
-
                 updateChatsList();
-
-                if (activeChat === partner) {
-                    renderMessages();
-                }
+                if (activeChat === partner) renderMessages();
             }
         };
 
-        // Поиск пользователя
         searchBtn.addEventListener('click', () => {
             const query = searchInput.value.trim();
             if (!query) return;
@@ -182,10 +179,7 @@
             activeChat = username;
             chatArea.style.display = 'flex';
             activeChatTitle.textContent = `@${username}`;
-            
-            if (!chatsData[username]) {
-                chatsData[username] = [];
-            }
+            if (!chatsData[username]) chatsData[username] = [];
             updateChatsList();
             renderMessages();
         }
@@ -199,7 +193,7 @@
                     <div class="avatar">${username[0].toUpperCase()}</div>
                     <div>
                         <div style="font-weight: bold;">@${username}</div>
-                        <div style="font-size: 0.8rem; color: #94a3b8;">Нажмите, чтобы открыть чат</div>
+                        <div style="font-size: 0.8rem; color: #94a3b8;">Открыть чат</div>
                     </div>
                 `;
                 item.onclick = () => openChat(username);
@@ -222,27 +216,14 @@
             messagesContainer.scrollTop = messagesContainer.scrollHeight;
         }
 
-        // Отправка сообщения
         messageForm.addEventListener('submit', (e) => {
             e.preventDefault();
             const text = messageInput.value.trim();
             if (!text || !activeChat) return;
 
-            ws.send(JSON.stringify({
-                type: 'SEND_MESSAGE',
-                recipient: activeChat,
-                text
-            }));
-
+            ws.send(JSON.stringify({ type: 'SEND_MESSAGE', recipient: activeChat, text }));
             messageInput.value = '';
         });
-
-        // Авто-логин при наличии сохраненных данных (опционально)
-        window.onload = () => {
-            const savedUser = localStorage.getItem('tg_username');
-            // Если захочешь сделать автоматический вход, можно добавить сохранение пароля, 
-            // но для безопасности сейчас вход происходит через форму при старте.
-        };
     </script>
 </body>
 </html>
