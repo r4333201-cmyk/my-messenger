@@ -1,17 +1,24 @@
+const express = require('express');
 const http = require('http');
 const WebSocket = require('ws');
+const path = require('path');
 
-const server = http.createServer((req, res) => {
-    res.writeHead(200, { 'Content-Type': 'text/plain' });
-    res.end('Server is running\n');
+const app = express();
+const server = http.createServer(app);
+const wss = new WebSocket.Server({ server });
+
+// Хранилище пользователей и активных клиентов { username: ws }
+const users = {
+    "test": "test" // Можешь добавить базового пользователя для проверки
+};
+const clients = new Map();
+
+// Явно отдаем index.html при заходе на сайт
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-// Увеличенный лимит (10 МБ) предотвращает падение сервера при отправке фото
-const wss = new WebSocket.Server({ server, maxPayload: 10 * 1024 * 1024 });
-
-const users = {}; 
-const clients = {}; 
-
+// Обработка WebSocket подключений
 wss.on('connection', (ws) => {
     let currentUsername = null;
 
@@ -19,74 +26,75 @@ wss.on('connection', (ws) => {
         try {
             const data = JSON.parse(message);
 
+            // Обработка входа / регистрации
             if (data.type === 'LOGIN') {
                 const { username, password } = data;
-                if (!username || !password) return;
+                if (!username || !password) {
+                    ws.send(JSON.stringify({ type: 'ERROR', message: 'Заполните все поля!' }));
+                    return;
+                }
 
                 if (users[username]) {
                     if (users[username] === password) {
                         currentUsername = username;
-                        clients[username] = ws;
+                        clients.set(username, ws);
                         ws.send(JSON.stringify({ type: 'LOGIN_SUCCESS', username }));
                     } else {
                         ws.send(JSON.stringify({ type: 'ERROR', message: 'Неверный пароль!' }));
                     }
                 } else {
+                    // Регистрация нового пользователя
                     users[username] = password;
                     currentUsername = username;
-                    clients[username] = ws;
+                    clients.set(username, ws);
                     ws.send(JSON.stringify({ type: 'LOGIN_SUCCESS', username }));
                 }
             }
 
+            // Поиск пользователя по username
             if (data.type === 'SEARCH_USER') {
                 const query = data.query.replace('@', '').trim();
-                if (users[query]) {
-                    ws.send(JSON.stringify({ type: 'SEARCH_RESULT', found: true, username: query }));
-                } else {
-                    ws.send(JSON.stringify({ type: 'SEARCH_RESULT', found: false }));
-                }
+                const exists = users.hasOwnProperty(query);
+                ws.send(JSON.stringify({ type: 'SEARCH_RESULT', found: exists, username: query }));
             }
 
+            // Отправка личного сообщения
             if (data.type === 'SEND_MESSAGE') {
                 if (!currentUsername) return;
-                
-                const { recipient, text, isImage } = data;
-                if (!recipient || text === undefined) return;
-
+                const { recipient, text } = data;
                 const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-                const messagePayload = JSON.stringify({
+                const messagePayload = {
                     type: 'NEW_MESSAGE',
                     from: currentUsername,
                     to: recipient,
                     text: text,
-                    time: time,
-                    isImage: !!isImage
-                });
+                    time: time
+                };
 
-                if (clients[recipient]) {
-                    clients[recipient].send(messagePayload);
+                // Отправляем получателю, если он онлайн
+                const recipientWs = clients.get(recipient);
+                if (recipientWs && recipientWs.readyState === WebSocket.OPEN) {
+                    recipientWs.send(JSON.stringify(messagePayload));
                 }
 
-                if (clients[currentUsername]) {
-                    clients[currentUsername].send(messagePayload);
-                }
+                // Отправляем обратно отправителю, чтобы у него тоже отобразилось
+                ws.send(JSON.stringify(messagePayload));
             }
 
-        } catch (e) {
-            console.error('Ошибка:', e);
+        } catch (err) {
+            console.error("Ошибка обработки сообщения:", err);
         }
     });
 
     ws.on('close', () => {
-        if (currentUsername && clients[currentUsername]) {
-            delete clients[currentUsername];
+        if (currentUsername) {
+            clients.delete(currentUsername);
         }
     });
 });
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 8080;
 server.listen(PORT, () => {
-    console.log(`Сервер запущен на порту ${PORT}`);
+    console.log(`Server is running on port ${PORT}`);
 });
