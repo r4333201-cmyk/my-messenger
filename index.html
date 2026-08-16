@@ -129,7 +129,9 @@
     </div>
 
     <script>
-        const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        // Укажите IP-адрес вашего компьютера и порт сервера (например: '192.168.1.50:8080')
+        // Если тестируете исключительно на одном компьютере через браузер, можете заменить на 'localhost:8080'
+        const SERVER_IP = '192.168.1.50:8080'; 
         let ws;
 
         let myUsername = null;
@@ -160,9 +162,10 @@
         const imageInput = document.getElementById('imageInput');
 
         function connectWebSocket() {
-            ws = new WebSocket(`${wsProtocol}//${window.location.host}`);
+            ws = new WebSocket(`ws://${SERVER_IP}`);
 
             ws.onopen = () => {
+                console.log('Подключено к серверу!');
                 const savedUser = localStorage.getItem('chat_username');
                 const savedPass = localStorage.getItem('chat_password');
                 if (savedUser && savedPass) {
@@ -176,7 +179,6 @@
                 if (data.type === 'LOGIN_SUCCESS') {
                     myUsername = data.username;
                     
-                    // Загружаем историю конкретно для этого юзера, чтобы аккаунты не пересекались
                     const savedChats = localStorage.getItem(`chat_history_${myUsername}`);
                     chatsData = savedChats ? JSON.parse(savedChats) : {};
 
@@ -201,7 +203,7 @@
                         }
                         openChat(foundUser);
                     } else {
-                        alert('Пользователь не найден!');
+                        alert('Пользователь не найден! Сначала друг должен зайти под этим ником на другом устройстве хотя бы один раз.');
                     }
                 }
 
@@ -209,9 +211,15 @@
                     const partner = data.from === myUsername ? data.to : data.from;
                     if (!chatsData[partner]) chatsData[partner] = [];
                     
-                    // Проверка на дубликаты по времени/тексту
-                    chatsData[partner].push(data);
-                    saveHistory();
+                    // Защита от дубликатов сообщений
+                    const isDuplicate = chatsData[partner].some(m => 
+                        m.time === data.time && m.text === data.text && m.from === data.from
+                    );
+                    
+                    if (!isDuplicate) {
+                        chatsData[partner].push(data);
+                        saveHistory();
+                    }
 
                     updateChatsList();
                     if (activeChat === partner) renderMessages();
@@ -219,7 +227,8 @@
             };
 
             ws.onclose = () => {
-                setTimeout(connectWebSocket, 3000); // Переподключение при обрыве
+                console.log('Соединение разорвано. Переподключение...');
+                setTimeout(connectWebSocket, 3000);
             };
         }
 
@@ -382,7 +391,7 @@
                 time: timeStr 
             }));
             messageInput.value = '';
-            messageInput.blur(); // Скрывает клавиатуру на мобильных устройствах после отправки
+            messageInput.blur();
         });
     </script>
 </body>
