@@ -24,11 +24,11 @@
         .error-msg { color: #f87171; font-size: 0.9rem; text-align: center; }
 
         #appScreen {
-            display: none; width: 100vw; height: 100vh; background: #0f172a; flex-direction: row; position: relative;
+            display: none; width: 100vw; height: 100vh; background: #0f172a; flex-direction: row; position: relative; overflow: hidden;
         }
         
         .sidebar {
-            width: 320px; background: #1e293b; border-right: 1px solid #334155; display: flex; flex-direction: column; height: 100%;
+            width: 320px; background: #1e293b; border-right: 1px solid #334155; display: flex; flex-direction: column; height: 100%; flex-shrink: 0;
         }
         .sidebar-header { padding: 15px; background: #0f172a; border-bottom: 1px solid #334155; display: flex; flex-direction: column; gap: 10px; }
         
@@ -44,7 +44,7 @@
         .chat-item:hover, .chat-item.active { background: #334155; }
         .avatar { width: 45px; height: 45px; border-radius: 50%; background: #38bdf8; color: #0f172a; display: flex; justify-content: center; align-items: center; font-weight: bold; font-size: 1.2rem; flex-shrink: 0; }
 
-        .chat-area { flex: 1; display: flex; flex-direction: column; background: #0b132b; height: 100%; }
+        .chat-area { flex: 1; display: flex; flex-direction: column; background: #0b132b; height: 100%; min-width: 0; }
         
         .chat-header { padding: 15px 20px; background: #1e293b; border-bottom: 1px solid #334155; font-weight: bold; font-size: 1.1rem; display: flex; align-items: center; gap: 15px; }
         
@@ -75,11 +75,35 @@
 
         /* Мобильная адаптивность */
         @media (max-width: 768px) {
-            .sidebar { width: 100%; display: flex; }
-            .chat-area { display: none; width: 100%; position: absolute; top: 0; left: 0; z-index: 10; height: 100%; }
+            #appScreen {
+                position: relative;
+            }
+            .sidebar {
+                width: 100%;
+                position: absolute;
+                top: 0;
+                left: 0;
+                height: 100%;
+                z-index: 1;
+                display: flex;
+            }
+            .chat-area {
+                width: 100%;
+                position: absolute;
+                top: 0;
+                left: 0;
+                height: 100%;
+                z-index: 2;
+                display: none; /* По умолчанию скрыт на мобильных */
+            }
             
-            #appScreen.chat-open .sidebar { display: none; }
-            #appScreen.chat-open .chat-area { display: flex; }
+            /* Когда чат открыт */
+            #appScreen.chat-open .sidebar {
+                display: none;
+            }
+            #appScreen.chat-open .chat-area {
+                display: flex;
+            }
             
             .back-btn { display: inline-block; }
             .message { max-width: 85%; }
