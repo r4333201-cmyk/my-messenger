@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Telegram Clone</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { background-color: #0f172a; color: #f8fafc; height: 100vh; display: flex; justify-content: center; align-items: center; }
+
+        #authScreen {
+            width: 100%; max-width: 400px; background: #1e293b; padding: 30px; border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.3); display: flex; flex-direction: column; gap: 15px;
+        }
+        #authScreen h2 { text-align: center; margin-bottom: 10px; color: #38bdf8; }
+        .input-field {
+            width: 100%; padding: 12px; border: none; border-radius: 8px; background: #334155; color: white; font-size: 1rem; outline: none;
+        }
+        .input-field:focus { border: 1px solid #38bdf8; }
+        .btn {
+            width: 100%; padding: 12px; background: #38bdf8; color: #0f172a; border: none; border-radius: 8px; font-weight: bold; font-size: 1rem; cursor: pointer; transition: background 0.2s;
+        }
+        .btn:hover { background: #0ea5e9; }
+        .error-msg { color: #f87171; font-size: 0.9rem; text-align: center; }
+
+        #appScreen {
+            display: none; width: 100vw; height: 100vh; background: #0f172a; flex-direction: row;
+        }
+        .sidebar {
+            width: 320px; background: #1e293b; border-right: 1px solid #334155; display: flex; flex-direction: column;
+        }
+        .sidebar-header { padding: 15px; background: #0f172a; border-bottom: 1px solid #334155; display: flex; flex-direction: column; gap: 10px; }
+        .search-box { display: flex; gap: 5px; }
+        .chats-list { flex: 1; overflow-y: auto; }
+        .chat-item {
+            padding: 15px; display: flex; align-items: center; gap: 12px; cursor: pointer; border-bottom: 1px solid #1e293b; transition: background 0.2s;
+        }
+        .chat-item:hover, .chat-item.active { background: #334155; }
+        .avatar { width: 45px; height: 45px; border-radius: 50%; background: #38bdf8; color: #0f172a; display: flex; justify-content: center; align-items: center; font-weight: bold; font-size: 1.2rem; }
+
+        .chat-area { flex: 1; display: flex; flex-direction: column; background: #0b132b; }
+        .chat-header { padding: 15px 20px; background: #1e293b; border-bottom: 1px solid #334155; font-weight: bold; font-size: 1.1rem; }
+        .messages-container { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
+        .message { max-width: 60%; padding: 10px 14px; border-radius: 10px; font-size: 0.95rem; word-break: break-word; }
+        .message.incoming { background: #1e293b; align-self: flex-start; }
+        .message.outgoing { background: #2563eb; align-self: flex-end; }
+        .msg-time { font-size: 0.75rem; color: #94a3b8; text-align: right; margin-top: 4px; }
+        
+        .message-input-area { padding: 15px; background: #1e293b; display: flex; gap: 10px; border-top: 1px solid #334155; }
+    </style>
+</head>
+<body>
+
+    <div id="authScreen">
+        <h2>Telegram Clone</h2>
+        <input type="text" id="usernameInput" class="input-field" placeholder="Придумайте Username (например, alex)">
+        <input type="password" id="passwordInput" class="input-field" placeholder="Придумайте Пароль">
+        <button class="btn" id="loginBtn">Войти / Регистрация</button>
+        <div class="error-msg" id="errorMsg"></div>
+    </div>
+
+    <div id="appScreen">
+        <div class="sidebar">
+            <div class="sidebar-header">
+                <div style="font-weight: bold; font-size: 1.1rem;" id="myUsernameDisplay"></div>
+                <div class="search-box">
+                    <input type="text" id="searchInput" class="input-field" placeholder="Найти по username...">
+                    <button class="btn" id="searchBtn" style="width: auto; padding: 0 15px;">🔍</button>
+                </div>
+            </div>
+            <div class="chats-list" id="chatsList"></div>
+        </div>
+
+        <div class="chat-area" id="chatArea" style="display: none;">
+            <div class="chat-header" id="activeChatTitle">Выберите чат</div>
+            <div class="messages-container" id="messagesContainer"></div>
+            <form class="message-input-area" id="messageForm">
+                <input type="text" id="messageInput" class="input-field" placeholder="Написать сообщение..." autocomplete="off" required>
+                <button type="submit" class="btn" style="width: auto; padding: 0 25px;">➤</button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        const ws = new WebSocket('ws://192.168.100.48:8080');
+
+        let myUsername = null;
+        let activeChat = null;
+        const chatsData = {};
+
+        const authScreen = document.getElementById('authScreen');
+        const appScreen = document.getElementById('appScreen');
+        const usernameInput = document.getElementById('usernameInput');
+        const passwordInput = document.getElementById('passwordInput');
+        const loginBtn = document.getElementById('loginBtn');
+        const errorMsg = document.getElementById('errorMsg');
+
+        const myUsernameDisplay = document.getElementById('myUsernameDisplay');
+        const searchInput = document.getElementById('searchInput');
+        const searchBtn = document.getElementById('searchBtn');
+        const chatsList = document.getElementById('chatsList');
+        
+        const chatArea = document.getElementById('chatArea');
+        const activeChatTitle = document.getElementById('activeChatTitle');
+        const messagesContainer = document.getElementById('messagesContainer');
+        const messageForm = document.getElementById('messageForm');
+        const messageInput = document.getElementById('messageInput');
+
+        // Проверяем, был ли сохранен пользователь ранее
+        ws.onopen = () => {
+            const savedUser = localStorage.getItem('chat_username');
+            const savedPass = localStorage.getItem('chat_password');
+            if (savedUser && savedPass) {
+                ws.send(JSON.stringify({ type: 'LOGIN', username: savedUser, password: savedPass }));
+            }
+        };
+
+        loginBtn.addEventListener('click', () => {
+            const username = usernameInput.value.trim();
+            const password = passwordInput.value.trim();
+            if (!username || !password) {
+                errorMsg.textContent = 'Заполните все поля!';
+                return;
+            }
+            // Сохраняем данные для автологина
+            localStorage.setItem('chat_username', username);
+            localStorage.setItem('chat_password', password);
+
+            ws.send(JSON.stringify({ type: 'LOGIN', username, password }));
+        });
+
+        ws.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+
+            if (data.type === 'LOGIN_SUCCESS') {
+                myUsername = data.username;
+                authScreen.style.display = 'none';
+                appScreen.style.display = 'flex';
+                myUsernameDisplay.textContent = `👤 @${myUsername}`;
+            }
+
+            if (data.type === 'ERROR') {
+                errorMsg.textContent = data.message;
+                // Если ошибка входа, сбрасываем сохраненные данные
+                localStorage.removeItem('chat_username');
+                localStorage.removeItem('chat_password');
+            }
+
+            if (data.type === 'SEARCH_RESULT') {
+                if (data.found) {
+                    const foundUser = data.username;
+                    if (foundUser === myUsername) {
+                        alert('Это ваш собственный username!');
+                        return;
+                    }
+                    openChat(foundUser);
+                } else {
+                    alert('Пользователь не найден!');
+                }
+            }
+
+            if (data.type === 'NEW_MESSAGE') {
+                const partner = data.from === myUsername ? data.to : data.from;
+                if (!chatsData[partner]) chatsData[partner] = [];
+                chatsData[partner].push(data);
+                updateChatsList();
+                if (activeChat === partner) renderMessages();
+            }
+        };
+
+        searchBtn.addEventListener('click', () => {
+            const query = searchInput.value.trim();
+            if (!query) return;
+            ws.send(JSON.stringify({ type: 'SEARCH_USER', query }));
+            searchInput.value = '';
+        });
+
+        function openChat(username) {
+            activeChat = username;
+            chatArea.style.display = 'flex';
+            activeChatTitle.textContent = `@${username}`;
+            if (!chatsData[username]) chatsData[username] = [];
+            updateChatsList();
+            renderMessages();
+        }
+
+        function updateChatsList() {
+            chatsList.innerHTML = '';
+            for (const username of Object.keys(chatsData)) {
+                const item = document.createElement('div');
+                item.className = `chat-item ${activeChat === username ? 'active' : ''}`;
+                item.innerHTML = `
+                    <div class="avatar">${username[0].toUpperCase()}</div>
+                    <div>
+                        <div style="font-weight: bold;">@${username}</div>
+                        <div style="font-size: 0.8rem; color: #94a3b8;">Открыть чат</div>
+                    </div>
+                `;
+                item.onclick = () => openChat(username);
+                chatsList.appendChild(item);
+            }
+        }
+
+        function renderMessages() {
+            messagesContainer.innerHTML = '';
+            const messages = chatsData[activeChat] || [];
+            for (const msg of messages) {
+                const div = document.createElement('div');
+                div.className = `message ${msg.from === myUsername ? 'outgoing' : 'incoming'}`;
+                div.innerHTML = `
+                    <div>${msg.text}</div>
+                    <div class="msg-time">${msg.time}</div>
+                `;
+                messagesContainer.appendChild(div);
+            }
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+
+        messageForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const text = messageInput.value.trim();
+            if (!text || !activeChat) return;
+
+            ws.send(JSON.stringify({ type: 'SEND_MESSAGE', recipient: activeChat, text }));
+            messageInput.value = '';
+        });
+    </script>
+</body>
+</html>
