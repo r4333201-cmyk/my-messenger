@@ -73,37 +73,13 @@
         }
         .attach-btn:hover { background: #475569; }
 
-        /* Мобильная адаптивность */
         @media (max-width: 768px) {
-            #appScreen {
-                position: relative;
-            }
-            .sidebar {
-                width: 100%;
-                position: absolute;
-                top: 0;
-                left: 0;
-                height: 100%;
-                z-index: 1;
-                display: flex;
-            }
-            .chat-area {
-                width: 100%;
-                position: absolute;
-                top: 0;
-                left: 0;
-                height: 100%;
-                z-index: 2;
-                display: none; /* По умолчанию скрыт на мобильных */
-            }
+            #appScreen { position: relative; }
+            .sidebar { width: 100%; position: absolute; top: 0; left: 0; height: 100%; z-index: 1; display: flex; }
+            .chat-area { width: 100%; position: absolute; top: 0; left: 0; height: 100%; z-index: 2; display: none; }
             
-            /* Когда чат открыт */
-            #appScreen.chat-open .sidebar {
-                display: none;
-            }
-            #appScreen.chat-open .chat-area {
-                display: flex;
-            }
+            #appScreen.chat-open .sidebar { display: none; }
+            #appScreen.chat-open .chat-area { display: flex; }
             
             .back-btn { display: inline-block; }
             .message { max-width: 85%; }
@@ -154,20 +130,11 @@
 
     <script>
         const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const ws = new WebSocket(`${wsProtocol}//${window.location.host}`);
+        let ws;
 
         let myUsername = null;
         let activeChat = null;
-        
         let chatsData = {};
-        const savedChats = localStorage.getItem('chat_history_data');
-        if (savedChats) {
-            try {
-                chatsData = JSON.parse(savedChats);
-            } catch (e) {
-                chatsData = {};
-            }
-        }
 
         const authScreen = document.getElementById('authScreen');
         const appScreen = document.getElementById('appScreen');
@@ -192,13 +159,71 @@
         const attachBtn = document.getElementById('attachBtn');
         const imageInput = document.getElementById('imageInput');
 
-        ws.onopen = () => {
-            const savedUser = localStorage.getItem('chat_username');
-            const savedPass = localStorage.getItem('chat_password');
-            if (savedUser && savedPass) {
-                ws.send(JSON.stringify({ type: 'LOGIN', username: savedUser, password: savedPass }));
-            }
-        };
+        function connectWebSocket() {
+            ws = new WebSocket(`${wsProtocol}//${window.location.host}`);
+
+            ws.onopen = () => {
+                const savedUser = localStorage.getItem('chat_username');
+                const savedPass = localStorage.getItem('chat_password');
+                if (savedUser && savedPass) {
+                    ws.send(JSON.stringify({ type: 'LOGIN', username: savedUser, password: savedPass }));
+                }
+            };
+
+            ws.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+
+                if (data.type === 'LOGIN_SUCCESS') {
+                    myUsername = data.username;
+                    
+                    // Загружаем историю конкретно для этого юзера, чтобы аккаунты не пересекались
+                    const savedChats = localStorage.getItem(`chat_history_${myUsername}`);
+                    chatsData = savedChats ? JSON.parse(savedChats) : {};
+
+                    authScreen.style.display = 'none';
+                    appScreen.style.display = 'flex';
+                    myUsernameDisplay.textContent = `👤 @${myUsername}`;
+                    updateChatsList();
+                }
+
+                if (data.type === 'ERROR') {
+                    errorMsg.textContent = data.message;
+                    localStorage.removeItem('chat_username');
+                    localStorage.removeItem('chat_password');
+                }
+
+                if (data.type === 'SEARCH_RESULT') {
+                    if (data.found) {
+                        const foundUser = data.username;
+                        if (foundUser === myUsername) {
+                            alert('Это ваш собственный username!');
+                            return;
+                        }
+                        openChat(foundUser);
+                    } else {
+                        alert('Пользователь не найден!');
+                    }
+                }
+
+                if (data.type === 'NEW_MESSAGE') {
+                    const partner = data.from === myUsername ? data.to : data.from;
+                    if (!chatsData[partner]) chatsData[partner] = [];
+                    
+                    // Проверка на дубликаты по времени/тексту
+                    chatsData[partner].push(data);
+                    saveHistory();
+
+                    updateChatsList();
+                    if (activeChat === partner) renderMessages();
+                }
+            };
+
+            ws.onclose = () => {
+                setTimeout(connectWebSocket, 3000); // Переподключение при обрыве
+            };
+        }
+
+        connectWebSocket();
 
         loginBtn.addEventListener('click', () => {
             const username = usernameInput.value.trim();
@@ -210,7 +235,9 @@
             localStorage.setItem('chat_username', username);
             localStorage.setItem('chat_password', password);
 
-            ws.send(JSON.stringify({ type: 'LOGIN', username, password }));
+            if(ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ type: 'LOGIN', username, password }));
+            }
         });
 
         logoutBtn.addEventListener('click', () => {
@@ -218,48 +245,6 @@
             localStorage.removeItem('chat_password');
             location.reload();
         });
-
-        ws.onmessage = (event) => {
-            const data = JSON.parse(event.data);
-
-            if (data.type === 'LOGIN_SUCCESS') {
-                myUsername = data.username;
-                authScreen.style.display = 'none';
-                appScreen.style.display = 'flex';
-                myUsernameDisplay.textContent = `👤 @${myUsername}`;
-                updateChatsList();
-            }
-
-            if (data.type === 'ERROR') {
-                errorMsg.textContent = data.message;
-                localStorage.removeItem('chat_username');
-                localStorage.removeItem('chat_password');
-            }
-
-            if (data.type === 'SEARCH_RESULT') {
-                if (data.found) {
-                    const foundUser = data.username;
-                    if (foundUser === myUsername) {
-                        alert('Это ваш собственный username!');
-                        return;
-                    }
-                    openChat(foundUser);
-                } else {
-                    alert('Пользователь не найден!');
-                }
-            }
-
-            if (data.type === 'NEW_MESSAGE') {
-                const partner = data.from === myUsername ? data.to : data.from;
-                if (!chatsData[partner]) chatsData[partner] = [];
-                chatsData[partner].push(data);
-                
-                localStorage.setItem('chat_history_data', JSON.stringify(chatsData));
-
-                updateChatsList();
-                if (activeChat === partner) renderMessages();
-            }
-        };
 
         searchBtn.addEventListener('click', () => {
             const query = searchInput.value.trim();
@@ -274,7 +259,6 @@
             if (!chatsData[username]) chatsData[username] = [];
             
             appScreen.classList.add('chat-open');
-            
             updateChatsList();
             renderMessages();
         }
@@ -284,6 +268,12 @@
             activeChat = null;
             updateChatsList();
         });
+
+        function saveHistory() {
+            if (myUsername) {
+                localStorage.setItem(`chat_history_${myUsername}`, JSON.stringify(chatsData));
+            }
+        }
 
         function updateChatsList() {
             chatsList.innerHTML = '';
@@ -345,7 +335,7 @@
                     let width = img.width;
                     let height = img.height;
                     
-                    const MAX_DIMENSION = 1200;
+                    const MAX_DIMENSION = 1000;
                     if (width > height && width > MAX_DIMENSION) {
                         height *= MAX_DIMENSION / width;
                         width = MAX_DIMENSION;
@@ -359,13 +349,16 @@
                     const ctx = canvas.getContext('2d');
                     ctx.drawImage(img, 0, 0, width, height);
                     
-                    const compressedBase64 = canvas.toDataURL('image/jpeg', 0.75);
+                    const compressedBase64 = canvas.toDataURL('image/jpeg', 0.7);
 
+                    const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                    
                     ws.send(JSON.stringify({ 
                         type: 'SEND_MESSAGE', 
                         recipient: activeChat, 
                         text: compressedBase64,
-                        isImage: true 
+                        isImage: true,
+                        time: timeStr
                     }));
                 }
                 img.src = uploadEvent.target.result;
@@ -379,8 +372,17 @@
             const text = messageInput.value.trim();
             if (!text || !activeChat) return;
 
-            ws.send(JSON.stringify({ type: 'SEND_MESSAGE', recipient: activeChat, text, isImage: false }));
+            const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+            ws.send(JSON.stringify({ 
+                type: 'SEND_MESSAGE', 
+                recipient: activeChat, 
+                text, 
+                isImage: false,
+                time: timeStr 
+            }));
             messageInput.value = '';
+            messageInput.blur(); // Скрывает клавиатуру на мобильных устройствах после отправки
         });
     </script>
 </body>
